@@ -27,8 +27,8 @@
       height: auto;
     }
 
-    .forgeViewer {
-      width: 50%;
+    .apsViewer {
+      width: 100%;
       height: calc(100vh - 2em);
       position: relative;
       float: left;
@@ -41,7 +41,7 @@
     <img class="logo" src="https://cdn.autodesk.io/logo/black/stacked.png " alt="Autodesk Forge">
     <span class="title">Simple Viewer Sync</span>
   </div>
-  <div id="viewersContainer">
+  <div id="viewerContainer" class="apsViewer">
   </div>
   <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.js"></script>
   <script src="./CalibrateBasisExtension.js"></script>
@@ -50,125 +50,37 @@
 <script>
   var tokenurl = 'https://l15xenb90a.execute-api.us-east-1.amazonaws.com/default/GetToken';
 
-  var viewers = [];
-
-  var currentViewer = null;
-
+  var viewer;
   async function initViewers() {
     await fetch(tokenurl).then(function (response) {
       return response.json();
     }).then(function (token) {
 
-      // Tables urns
-      let urns = ['dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cmVuZGVyY29tcGFyZWpwb20vZGVzay5ydnQ', 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cmVuZGVyY29tcGFyZWpwb20vZGVzay5tYXg'];
-
-      // Vidyatech urns
-      // let urns = ['dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cmVuZGVyY29tcGFyZWpwb20vN3Aubndk', 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cmVuZGVyY29tcGFyZWpwb20vN3AtMTAuNU0uZ2xi'];
+      // Sample urns
+      let urns = ['dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Y29vcmRpbmF0ZW1vZGVsc2pwb20vcmFjYmFzaWNzYW1wbGVwcm9qZWN0LTEwLnJ2dA', 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Y29vcmRpbmF0ZW1vZGVsc2pwb20vcnN0YmFzaWNzYW1wbGVwcm9qZWN0LnJ2dA'];
 
       const options = {
         env: 'AutodeskProduction',
         accessToken: token
       };
 
-      urns.forEach((urn, i) => {
-        Autodesk.Viewing.Initializer(options, () => {
+      Autodesk.Viewing.Initializer(options, () => {
+        let viewerDiv = document.getElementById("viewerContainer");
+        const config = {
+          extensions: ['CalibrateBasisExtension', 'Autodesk.DataVisualization']
+        };
+        viewer = new Autodesk.Viewing.Private.GuiViewer3D(viewerDiv, config);
+        viewer.start();
+        viewer.setTheme("light-theme");
+      });
 
-          let viewerDiv = document.createElement("div");
-          viewerDiv.className = "forgeViewer";
-          viewerDiv.id = `viewer${i}`;
-          viewerDiv.onmouseover = (e) => {
-            if (!!e.target.viewer)
-              currentViewer = e.target.viewer;
-          };
-          document.getElementById("viewersContainer").appendChild(viewerDiv);
-
-          const config = {
-            extensions: ['CalibrateBasisExtension', 'Autodesk.DataVisualization']
-          };
-
-          let viewer = new Autodesk.Viewing.Private.GuiViewer3D(viewerDiv, config);
-          viewer.start();
-          viewer.setTheme("light-theme");
-          Autodesk.Viewing.Document.load(`urn:${urn}`, doc => {
-            var viewables = doc.getRoot().getDefaultGeometry();
-            viewer.loadDocumentNode(doc, viewables);
-            viewer.addEventListener(Autodesk.Viewing.CAMERA_CHANGE_EVENT, (e) => handleChange(e));
-            viewers.push(viewer);
-          });
+      urns.map((urn) => {
+        Autodesk.Viewing.Document.load(`urn:${urn}`, doc => {
+          var viewables = doc.getRoot().getDefaultGeometry();
+          viewer.loadDocumentNode(doc, viewables);
         });
       });
     });
-  }
-
-  async function addSphere(center, viewer, red) {
-    var geom = new THREE.SphereGeometry(1.5, 8, 8);
-    let sphereColor = red ? 0xff0000 : 0x00ff00;
-    var material = new THREE.MeshBasicMaterial({ color: sphereColor });
-    var sphereMesh = new THREE.Mesh(geom, material);
-    sphereMesh.position.set(center.x, center.y, center.z);
-    if (!viewer.overlays.hasScene('custom-scene')) {
-      viewer.overlays.addScene('custom-scene');
-    }
-    viewer.overlays.addMesh(sphereMesh, 'custom-scene');
-  }
-
-  async function clearScene(viewer) {
-    if (!viewer.overlays.hasScene('custom-scene')) {
-      viewer.overlays.clearScene('custom-scene');
-    }
-  }
-
-  function handleChange(e) {
-    if (e.target === currentViewer) {
-      if (isCalibrationAvailable()) {
-        let targetViewer = viewers.find(v => v !== currentViewer);
-        let targetViewerBase = targetViewer.getExtension('CalibrateBasisExtension').tool.spaceBaseNormal.clone();
-        let targetViewerVector = targetViewer.getExtension('CalibrateBasisExtension').tool.obliqueVector.clone();
-        let originViewer = currentViewer;
-        let originViewerBase = originViewer.getExtension('CalibrateBasisExtension').tool.spaceBaseNormal.clone();
-        let originViewerVector = originViewer.getExtension('CalibrateBasisExtension').tool.obliqueVector.clone();
-
-        let rotationMatrix = findRotation(targetViewerBase, originViewerBase);
-        let scaleMatrix = findScale(targetViewerVector, originViewerVector);
-        let originBaseOrigin = originViewer.getExtension('CalibrateBasisExtension').tool.baseOrigin;
-        let targetBaseOrigin = targetViewer.getExtension('CalibrateBasisExtension').tool.baseOrigin;
-        let newTarget = originViewer.getCamera().target.clone().sub(originBaseOrigin).applyMatrix4(rotationMatrix).applyMatrix4(scaleMatrix).add(targetBaseOrigin);
-        let newPosition = originViewer.getCamera().position.clone().sub(originBaseOrigin).applyMatrix4(rotationMatrix).applyMatrix4(scaleMatrix).add(targetBaseOrigin);
-        let newUpVector = originViewer.getCamera().up.clone().applyMatrix4(rotationMatrix);
-
-        targetViewer.navigation.setView(newPosition, newTarget);
-        targetViewer.navigation.setCameraUpVector(newUpVector);
-      }
-      else {
-        let options = {
-          seedURN: false,
-          objectSet: false,
-          viewport: true,
-          renderOptions: true,
-          cutplanes: true
-        };
-        let currentViewerState = currentViewer.getState(options);
-        let targetViewer = viewers.find(v => v !== currentViewer);
-        // targetViewer.restoreState(currentViewerState);
-      }
-    }
-  }
-
-  function isCalibrationAvailable() {
-    let isCalibrationAvailable = true;
-    viewers.forEach(v => {
-      if (!v.getExtension('CalibrateBasisExtension').tool.spaceBaseNormal)
-        isCalibrationAvailable = false;
-    });
-    return isCalibrationAvailable;
-  }
-
-  function findRotation(targetViewerBase, originViewerBase) {
-    return (new THREE.Matrix4()).multiplyMatrices(targetViewerBase, originViewerBase.transpose());
-  }
-
-  function findScale(targetViewerVector, originViewerVector) {
-    return (new THREE.Matrix4()).makeScale(targetViewerVector.length() / originViewerVector.length(), targetViewerVector.length() / originViewerVector.length(), targetViewerVector.length() / originViewerVector.length());
   }
 
 </script>

@@ -7,7 +7,7 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
     this.names = [CalibrateBasisToolName];
     this.active = false;
     this.snapper = null;
-    this.points = [];
+    this.points = {};
     // Hack: delete functions defined on the *instance* of a ToolInterface (we want the tool controller to call our class methods instead)
     delete this.register;
     delete this.deregister;
@@ -55,12 +55,16 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
     let secondPointIconUrl = "https://img.icons8.com/ios/50/null/2-circle.png";
     let thirdPointIconUrl = "https://img.icons8.com/ios/50/null/3-circle.png";
     let fourthPointIconUrl = "https://img.icons8.com/ios/50/null/4-circle.png";
+    let fifthPointIconUrl = "https://img.icons8.com/ios/50/null/5-circle.png";
+    let sixthPointIconUrl = "https://img.icons8.com/ios/50/null/6-circle.png";
 
     this.pointStyles = [
       new DataVizCore.ViewableStyle(viewableType, pointsColor, firstPointIconUrl),
       new DataVizCore.ViewableStyle(viewableType, pointsColor, secondPointIconUrl),
       new DataVizCore.ViewableStyle(viewableType, pointsColor, thirdPointIconUrl),
-      new DataVizCore.ViewableStyle(viewableType, pointsColor, fourthPointIconUrl)
+      new DataVizCore.ViewableStyle(viewableType, pointsColor, fourthPointIconUrl),
+      new DataVizCore.ViewableStyle(viewableType, pointsColor, fifthPointIconUrl),
+      new DataVizCore.ViewableStyle(viewableType, pointsColor, sixthPointIconUrl)
     ];
   }
 
@@ -98,19 +102,25 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
     if (button === 0 && this.snapper.isSnapped()) {
       const result = this.snapper.getSnapResult();
       const { SnapType } = Autodesk.Viewing.MeasureCommon;
-      this.points.push(result.intersectPoint.clone());
-      let addedPointIndex = this.points.length - 1;
-      this.renderSprite(this.points[addedPointIndex], addedPointIndex + 10000, addedPointIndex)
+      if(!this.points[result.modelId]){
+        this.points[result.modelId] = [];
+      }
+      this.points[result.modelId].push(result.intersectPoint.clone());
+      let addedPointIndex = this.points[result.modelId].length - 1;
+      let addedPoints = Object.values(this.points).flat().length;
+      this.renderSprite(this.points[result.modelId][addedPointIndex], addedPoints + 10000, addedPoints-1);
 
-      if (this.points.length == 4) {
-        if (this.arePointsCoplanar()) {
-          return true;
-        }
+      switch(addedPoints){
+        case 1:
+          this.transformingModelId = result.modelId;
+          break;
+        case 6:
 
-        this.updatePoints();
-        this.resetPoints();
-        this.deactivate();
-        return true; // Stop the event from going to other tools in the stack
+          this.updatePoints();
+          this.resetPoints();
+          return true; // Stop the event from going to other tools in the stack
+        default:
+          break;
       }
     }
     return false;
@@ -119,7 +129,6 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
   arePointsCoplanar() {
     let v12 = this.points[1].clone().sub(this.points[0]);
     let v13 = this.points[2].clone().sub(this.points[0]);
-    let v14 = this.points[3].clone().sub(this.points[0]);
     return Math.abs(v12.cross(v13).dot(v14)) < 0.0001;
   }
 
@@ -134,25 +143,32 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
   }
 
   updatePoints() {
-    let v12 = this.points[1].clone().sub(this.points[0]);
-    let v13 = this.points[2].clone().sub(this.points[0]);
-    this.basis1 = this.points[1].clone().sub(this.points[0]);
-    let line12 = new THREE.Line3(this.points[0], this.points[1]);
-    let plane123 = (new THREE.Plane()).setFromCoplanarPoints(this.points[0], this.points[1], this.points[2]);
-    let auxPoint = line12.closestPointToPoint(this.points[2], false);
-    this.basis2 = this.points[2].clone().sub(auxPoint);
-    let auxDistance = plane123.distanceToPoint(this.points[3]);
-    let auxVector = v12.cross(v13);
-    this.basis3 = auxVector.normalize().multiplyScalar(auxDistance);
 
-    let auxbaseMatrix = new THREE.Matrix4();
-    this.baseOrigin = this.points[0].clone();
-    this.obliqueVector = this.basis1.clone().add(this.basis2.clone()).add(this.basis3.clone());
-    this.spaceBaseNormal = auxbaseMatrix.clone().makeBasis(this.basis1.clone().normalize(), this.basis2.clone().normalize(), this.basis3.clone().normalize());
+    let modelToTransform = this.viewer.getAllModels().find(m => m.id === this.transformingModelId);
+    let fixedModelId = this.transformingModelId === 1 ? 2 : 1;
+
+    let translationVector = this.points[fixedModelId][0].sub(this.points[this.transformingModelId][0]);
+    let translationMatrix = (new THREE.Matrix4()).makeTranslation(translationVector.x, translationVector.y, translationVector.z);
+
+    //First rotation
+    let firstRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][1].sub(this.points[this.transformingModelId][0]), this.points[fixedModelId][1].sub(this.points[fixedModelId][0]));
+
+    //Second rotation
+    let secondRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][2].sub(this.points[this.transformingModelId][1]), this.points[fixedModelId][2].sub(this.points[fixedModelId][1]));
+
+    modelToTransform.setModelTransform(firstRotationMatrix);
+    modelToTransform.setModelTransform(secondRotationMatrix);
+    modelToTransform.setModelTransform(translationMatrix);
+  }
+
+  findRotationMatrix(firstVector, secondVector){
+    let rotationAxis = (new THREE.Vector3()).crossVectors(firstVector, secondVector).normalize();
+    let rotationAngle = firstVector.angleTo(secondVector);
+    return (new THREE.Matrix4()).makeRotationAxis(rotationAxis, rotationAngle);
   }
 
   resetPoints() {
-    this.points = [];
+    this.points = {};
   }
 
   clearSprites() {
