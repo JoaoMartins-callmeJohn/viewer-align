@@ -1,10 +1,10 @@
-const CalibrateBasisToolName = 'calibratebasis-tool';
+const ModelTranslateToolName = 'modeltranslate-tool';
 
-class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
+class ModelTranslateTool extends Autodesk.Viewing.ToolInterface {
   constructor(viewer, options) {
     super();
     this.viewer = viewer;
-    this.names = [CalibrateBasisToolName];
+    this.names = [ModelTranslateToolName];
     this.active = false;
     this.snapper = null;
     this.points = {};
@@ -23,19 +23,19 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
     this.snapper = new Autodesk.Viewing.Extensions.Snapping.Snapper(this.viewer, { renderSnappedGeometry: false, renderSnappedTopology: false });
     this.viewer.toolController.registerTool(this.snapper);
     this.viewer.toolController.activateTool(this.snapper.getName());
-    console.log('CalibrateBasisTool registered.');
+    console.log('ModelTranslateTool registered.');
   }
 
   deregister() {
     this.viewer.toolController.deactivateTool(this.snapper.getName());
     this.viewer.toolController.deregisterTool(this.snapper);
     this.snapper = null;
-    console.log('CalibrateBasisTool unregistered.');
+    console.log('ModelTranslateTool unregistered.');
   }
 
   activate(name, viewer) {
     if (!this.active) {
-      console.log('CalibrateBasisTool activated.');
+      console.log('ModelTranslateTool activated.');
       this.active = true;
 
       this.prepareDataViz();
@@ -53,24 +53,16 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
 
     let firstPointIconUrl = "https://img.icons8.com/ios/50/null/1-circle.png";
     let secondPointIconUrl = "https://img.icons8.com/ios/50/null/2-circle.png";
-    let thirdPointIconUrl = "https://img.icons8.com/ios/50/null/3-circle.png";
-    let fourthPointIconUrl = "https://img.icons8.com/ios/50/null/4-circle.png";
-    let fifthPointIconUrl = "https://img.icons8.com/ios/50/null/5-circle.png";
-    let sixthPointIconUrl = "https://img.icons8.com/ios/50/null/6-circle.png";
 
     this.pointStyles = [
       new DataVizCore.ViewableStyle(viewableType, pointsColor, firstPointIconUrl),
-      new DataVizCore.ViewableStyle(viewableType, pointsColor, secondPointIconUrl),
-      new DataVizCore.ViewableStyle(viewableType, pointsColor, thirdPointIconUrl),
-      new DataVizCore.ViewableStyle(viewableType, pointsColor, fourthPointIconUrl),
-      new DataVizCore.ViewableStyle(viewableType, pointsColor, fifthPointIconUrl),
-      new DataVizCore.ViewableStyle(viewableType, pointsColor, sixthPointIconUrl)
+      new DataVizCore.ViewableStyle(viewableType, pointsColor, secondPointIconUrl)
     ];
   }
 
   deactivate(name) {
     if (this.active) {
-      console.log('CalibrateBasisTool deactivated.');
+      console.log('ModelTranslateTool deactivated.');
       this.active = false;
     }
   }
@@ -102,20 +94,19 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
     if (button === 0 && this.snapper.isSnapped()) {
       const result = this.snapper.getSnapResult();
       const { SnapType } = Autodesk.Viewing.MeasureCommon;
-      if(!this.points[result.modelId]){
+      if (!this.points[result.modelId]) {
         this.points[result.modelId] = [];
       }
       this.points[result.modelId].push(result.intersectPoint.clone());
       let addedPointIndex = this.points[result.modelId].length - 1;
       let addedPoints = Object.values(this.points).flat().length;
-      this.renderSprite(this.points[result.modelId][addedPointIndex], addedPoints + 10000, addedPoints-1);
+      this.renderSprite(this.points[result.modelId][addedPointIndex], addedPoints + 10000, addedPoints - 1);
 
-      switch(addedPoints){
+      switch (addedPoints) {
         case 1:
           this.transformingModelId = result.modelId;
           break;
-        case 6:
-
+        case 2:
           this.updatePoints();
           this.resetPoints();
           return true; // Stop the event from going to other tools in the stack
@@ -147,24 +138,21 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
     let modelToTransform = this.viewer.getAllModels().find(m => m.id === this.transformingModelId);
     let fixedModelId = this.transformingModelId === 1 ? 2 : 1;
 
-    let translationVector = this.points[fixedModelId][0].sub(this.points[this.transformingModelId][0]);
-    let translationMatrix = (new THREE.Matrix4()).makeTranslation(translationVector.x, translationVector.y, translationVector.z);
+    let translationVector = this.points[fixedModelId][0].clone().sub(this.points[this.transformingModelId][0]);
 
-    //First rotation
-    let firstRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][1].sub(this.points[this.transformingModelId][0]), this.points[fixedModelId][1].sub(this.points[fixedModelId][0]));
+    let transformationMatrix;
+    let auxTransform = modelToTransform.getModelTransform();
+    if (!!auxTransform) {
+      auxTransform.elements[12] += translationVector.x;
+      auxTransform.elements[13] += translationVector.y;
+      auxTransform.elements[14] += translationVector.z;
+      transformationMatrix = auxTransform;
+    }
+    else {
+      transformationMatrix = (new THREE.Matrix4()).makeTranslation(translationVector.x, translationVector.y, translationVector.z);
+    }
 
-    //Second rotation
-    let secondRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][2].sub(this.points[this.transformingModelId][1]), this.points[fixedModelId][2].sub(this.points[fixedModelId][1]));
-
-    modelToTransform.setModelTransform(firstRotationMatrix);
-    modelToTransform.setModelTransform(secondRotationMatrix);
-    modelToTransform.setModelTransform(translationMatrix);
-  }
-
-  findRotationMatrix(firstVector, secondVector){
-    let rotationAxis = (new THREE.Vector3()).crossVectors(firstVector, secondVector).normalize();
-    let rotationAngle = firstVector.angleTo(secondVector);
-    return (new THREE.Matrix4()).makeRotationAxis(rotationAxis, rotationAngle);
+    modelToTransform.setModelTransform(transformationMatrix);
   }
 
   resetPoints() {
@@ -188,11 +176,11 @@ class CalibrateBasisTool extends Autodesk.Viewing.ToolInterface {
 
 }
 
-class CalibrateBasisExtension extends Autodesk.Viewing.Extension {
+class ModelTranslateExtension extends Autodesk.Viewing.Extension {
   constructor(viewer, options) {
     super(viewer, options);
     this._button = null;
-    this.tool = new CalibrateBasisTool(viewer);
+    this.tool = new ModelTranslateTool(viewer);
     this._onObjectTreeCreated = (ev) => this.onModelLoaded(ev.model);
   }
 
@@ -217,23 +205,23 @@ class CalibrateBasisExtension extends Autodesk.Viewing.Extension {
 
   onToolbarCreated() {
     const controller = this.viewer.toolController;
-    this._button = this.createToolbarButton('coordinatesextension-button', 'https://img.icons8.com/small/30/null/place-marker.png', 'Calibrate coordinates basis points');
+    this._button = this.createToolbarButton('modeltranslateextension-button', 'https://img.icons8.com/pastel-glyph/30/null/move.png', 'Translate model based on two points');
     this._button.onClick = () => {
-      if (controller.isToolActivated(CalibrateBasisToolName)) {
-        controller.deactivateTool(CalibrateBasisToolName);
+      if (controller.isToolActivated(ModelTranslateToolName)) {
+        controller.deactivateTool(ModelTranslateToolName);
         this.tool.clearSprites();
         this._button.setState(Autodesk.Viewing.UI.Button.State.INACTIVE);
       } else {
-        controller.activateTool(CalibrateBasisToolName);
+        controller.activateTool(ModelTranslateToolName);
         this._button.setState(Autodesk.Viewing.UI.Button.State.ACTIVE);
       }
     };
   }
 
   createToolbarButton(buttonId, buttonIconUrl, buttonTooltip) {
-    let group = this.viewer.toolbar.getControl('coordinates-toolbar-group');
+    let group = this.viewer.toolbar.getControl('modeltransformation-toolbar-group');
     if (!group) {
-      group = new Autodesk.Viewing.UI.ControlGroup('coordinates-toolbar-group');
+      group = new Autodesk.Viewing.UI.ControlGroup('modeltransformation-toolbar-group');
       this.viewer.toolbar.addControl(group);
     }
     const button = new Autodesk.Viewing.UI.Button(buttonId);
@@ -250,9 +238,9 @@ class CalibrateBasisExtension extends Autodesk.Viewing.Extension {
   }
 
   removeToolbarButton(button) {
-    const group = this.viewer.toolbar.getControl('coordinates-toolbar-group');
+    const group = this.viewer.toolbar.getControl('modeltransformation-toolbar-group');
     group.removeControl(button);
   }
 }
 
-Autodesk.Viewing.theExtensionManager.registerExtension('CalibrateBasisExtension', CalibrateBasisExtension);
+Autodesk.Viewing.theExtensionManager.registerExtension('ModelTranslateExtension', ModelTranslateExtension);

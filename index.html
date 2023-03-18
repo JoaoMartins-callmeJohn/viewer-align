@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.css">
-  <title>Autodesk Platform Services: Simple Sync</title>
+  <title>Autodesk Platform Services: Simple Align</title>
   <style type="text/css">
     body,
     html {
@@ -38,13 +38,14 @@
 
 <body onload="initViewers()">
   <div id="header">
-    <img class="logo" src="https://cdn.autodesk.io/logo/black/stacked.png " alt="Autodesk Forge">
-    <span class="title">Simple Viewer Sync</span>
+    <img class="logo" src="https://cdn.autodesk.io/logo/black/stacked.png " alt="Autodesk Platform Services">
+    <span class="title">Simple Viewer Align</span>
   </div>
   <div id="viewerContainer" class="apsViewer">
   </div>
   <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.js"></script>
-  <script src="./CalibrateBasisExtension.js"></script>
+  <script src="./ModelAlignExtension.js"></script>
+  <script src="./ModelTranslateExtension.js"></script>
 </body>
 
 <script>
@@ -67,20 +68,36 @@
       Autodesk.Viewing.Initializer(options, () => {
         let viewerDiv = document.getElementById("viewerContainer");
         const config = {
-          extensions: ['CalibrateBasisExtension', 'Autodesk.DataVisualization']
+          extensions: ['ModelAlignExtension', 'ModelTranslateExtension', 'Autodesk.DataVisualization']
         };
         viewer = new Autodesk.Viewing.Private.GuiViewer3D(viewerDiv, config);
         viewer.start();
         viewer.setTheme("light-theme");
       });
 
-      urns.map((urn) => {
+      urns.map((urn, index) => {
         Autodesk.Viewing.Document.load(`urn:${urn}`, doc => {
+          let randomTransformation = index == 0 ? null : generateRandomMatrix();
           var viewables = doc.getRoot().getDefaultGeometry();
-          viewer.loadDocumentNode(doc, viewables);
+          viewer.loadDocumentNode(doc, viewables, {
+            keepCurrentModels: true,
+            placementTransform: randomTransformation
+          });
         });
       });
     });
+  }
+
+  function generateRandomMatrix() {
+    let maxValue = 1.57;
+    let rotationX = +(Math.random() * maxValue).toFixed(2);
+    let rotationMatrixX = (new THREE.Matrix4()).makeRotationY(rotationX);
+    let rotationY = +(Math.random() * maxValue).toFixed(2);
+    let rotationMatrixY = (new THREE.Matrix4()).makeRotationY(rotationY);
+    let rotationZ = +(Math.random() * maxValue).toFixed(2);
+    let rotationMatrixZ = (new THREE.Matrix4()).makeRotationY(rotationZ);
+
+    return rotationMatrixX.multiply(rotationMatrixY).multiply(rotationMatrixZ);
   }
 
 </script>
