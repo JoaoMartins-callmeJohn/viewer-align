@@ -1,139 +1,128 @@
-# viewer-sync
+# viewer-align
+
+# WORK IN PROGRESS
 
 ## Introduction
-This sample demonstrates a way to syncronize two Viewers rendering the same project, but originated from diferent sources. It can be useful for a side by side comparision between a nwd, rvt, 3ds max design or a mesh, for instance.
+
+This sample demonstrates a way to align and transform two models in the same scene. Maybe you have each discipline coming from a different source format, softwares or designed in a way that they don't simply align with each other when loaded in the same scene. This sample will show how you can take advantage of common points from different models in order to align them.
 
 ## Premises
-As our base assumption for this sample, we're going to assume that the models are compatible, i.e they refer to the same scene, differing in scale and/or rotation.
 
-Our challenge will be on finding a way to syncronize the camera between the compatible scenes. Lets suppose we have two scenes rendering a table: If the tables are compatible, they both share the same proportions (length, width and heigth) in a way that we can define an equivalence of coordinates from them.
+As our base assumption for this sample, we're going to assume that the models are compatible, i.e they refer to the same context, differing in positioning and/or rotation. We aren't handling rotation in this example to simplify our workflow, but it can easily be addressed using similar logic.
+
+Our challenge will be on finding a way to adjust the two models in the same scene. Lets suppose we have two models refering to the same project/context: If the models are compatible, they can be oriented in a way to complete each other in an aggregated scene.
 
 ## How to find the equivalence?
-When we move from one scene to the other, there are a few transformations that we need to consider.
 
-First of them is rotation, as the tables can be misaligned:
+Considering that the models can have any orientation and positioning in the scene, we need to address these differences.
 
-![rotation difference](./assets/tables_rotation.gif)
+- First of them is rotation, as the models can be misaligned.
 
-The other transformation that we need to consider is regarding scale:
+- The other transformation that we need to consider is regarding translation, so they stay compatible
 
-![scale difference](./assets/tables_scale.gif)
+With a combination of all these conversions (rotation and translation) we can align the two models in the scene.
 
-Lastly, we also need to consider the different origins for the coordinates systems of those scenes.
+## The math behind the Alignment
 
-With a combination of all these conversions (rotation, scale and translation) we can syncronize the two scenes.
+Before jumping into the math for our calculations, lets begin with some contextualization.
 
-## The math behind the sync
-Before jumping into the math for our calculations, lets begin with some contextuakization.
+Each model is oriented in its own way, that might seem "wrong"when compared with each other.
 
-Both scenes represent each a [vector space](https://en.wikipedia.org/wiki/Vector_space), with its own coordinate system.
+![misaligned models]()
 
-![coordinate systems](./assets/coordinate_systems.png)
+We need to find common points in the models that will serve as references for alignment.
 
-Each space will have its own [basis](https://en.wikipedia.org/wiki/Basis_(linear_algebra)), that we'll use to find the proper transformations. So first of all, we need to find those.
+### - Defining the common points for rotation
 
-### - Finding the basis
-Each Viewer scene itself has its own coordinate system with basis defined, but we can't simply use those, as they don't "see" the model the same way.
+To align the models in regards to rotation, we need 3 points for each of them, that we can refer as points from 1 to 6.
 
-If we have two basis representing the models in the scene with the same relative orientation, we can defina a transformation between those. This transformation will be useful to convert coordinates between these two spaces.
+- 1 to 3 from model A (non-colinear)
+- 4 to 6 from model B (non-colinear)
 
-To find these basis, we can query the user to pick 4 points (in each scene).
+![6 points taken]()
 
-These points need to be compatible between both scenes, and can'b be [coplanar](https://en.wikipedia.org/wiki/Coplanarity)
-Let's use an example:
+These points can be used to define which rotations we'll need to perform in order to align our models.
 
-- 1st point = front end of the table base, below the 4 drawers
-- 2nd point = front end of the table base, below the 2 drawers
-- 3rd point = front end of the table top, above the 2 drawers
-- 4th point = rear end of the table top, above the 2 drawers
+From these points we can have 4 vectors:
 
-![pick points](./assets/pick_points.gif)
+- v12 from model A
+- v23 from model A
+- v45 from model B
+- v56 from model B
 
-From these points, we can define our base with the snippet below:
+![4 vectors from 6 points]()
 
-```js
-let v12 = this.points[1].clone().sub(this.points[0]);
-let v13 = this.points[2].clone().sub(this.points[0]);
-this.basis1 = this.points[1].clone().sub(this.points[0]);
+First rotation is done through the axis of the vectorial product between v12 and v45, by the lesser angle formed between them.
 
-let line12 = new THREE.Line3(this.points[0], this.points[1]);
-let plane123 = (new THREE.Plane()).setFromCoplanarPoints(this.points[0], this.points[1], this.points[2]);
-let auxPoint = line12.closestPointToPoint(this.points[2], false);
-this.basis2 = this.points[2].clone().sub(auxPoint);
+![first rotation from vectors]()
 
-let auxDistance = plane123.distanceToPoint(this.points[3]);
-let auxVector = v12.cross(v13);
-this.basis3 = auxVector.normalize().multiplyScalar(auxDistance);
+Second rotation is done through the axis of the vectorial product between v23 and v56, by the lesser angle formed between them.  
 
-let auxbaseMatrix = new THREE.Matrix4();
-this.baseOrigin = this.points[0].clone();
+![second rotation from vectors]()
 
-this.obliqueVector = this.basis1.clone().add(this.basis2.clone()).add(this.basis3.clone());
-
-this.spaceBaseNormal = auxbaseMatrix.clone().makeBasis(this.basis1.clone().normalize(), this.basis2.clone().normalize(), this.basis3.clone().normalize());
-```
-
-First vector of our base will be the vector from point 1 to point 2
-
-![first vector](./assets/first_vector.png)
-
-Second vector of our base will be the height of the triangle formed by points 1, 2 and 3 (taking as base the line passing by points 1 and 2)
-
-![second vector](./assets/second_vector.png)
-
-Third vector will be perpendicular to the previous bases and its module will be the distance between the plane 123 and point 4.
-
-![third vector](./assets/third_vector.png)
-
-And that's it!
-Our space base will be formed by these normalized vectors, and it'll help us to take care of the rotation between the two scenes.
-
-We also defined an oblique vector (suming the three basis vectors without normalization) that we'll use to take care of the scaling.
-
-These two spaces basis origins will help us figuring out the translation between coordinates.
-
-### - Handling rotation
-The transformation between the two spaces basis can be found using the snippet below:
+From these angles and axis, we can define our rotation matrices with the function below:
 
 ```js
-function findRotation(targetViewerBase, originViewerBase) {
-    return (new THREE.Matrix4()).multiplyMatrices(targetViewerBase, originViewerBase.transpose());
+findRotationMatrix(firstVector, secondVector) {
+  let rotationAxis = (new THREE.Vector3()).crossVectors(firstVector, secondVector).normalize();
+  let rotationAngle = firstVector.angleTo(secondVector);
+  return (new THREE.Matrix4()).makeRotationAxis(rotationAxis, rotationAngle);
 }
 ```
 
-In our case, we'll use the base created with the normalized vectors, so it returns a matrix the we'll use to transform any vector orientation from originViewerBase to originViewerBase.
+We just need to be aware that by the time we apply the second rotation, the first rotation would already be applied, so we need to apply the first rotation matrix on the points moved before defining the second rotation matrix.
 
-### - Handling scale
-For scaling, we are going to assume that we have the same scale factor for all the axis (x, y, and z). If we apply different scale factor, that would mean that we have a distortion among the scenes (i.e. the proportions were'nt respected in one specific scene).
-The scale can be found using the function below:
 ```js
-function findScale(targetViewerVector, originViewerVector) {
-    return (new THREE.Matrix4()).makeScale(targetViewerVector.length() / originViewerVector.length(), targetViewerVector.length() / originViewerVector.length(), targetViewerVector.length() / originViewerVector.length());
-}
+//First rotation
+let firstRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][1].clone().sub(this.points[this.transformingModelId][0]), this.points[fixedModelId][1].clone().sub(this.points[fixedModelId][0]));
+
+//Second rotation
+let secondRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][2].clone().applyMatrix4(firstRotationMatrix).sub(this.points[this.transformingModelId][1].clone().applyMatrix4(firstRotationMatrix)), this.points[fixedModelId][2].clone().sub(this.points[fixedModelId][1].clone()));
 ```
-In our case, we'll use the oblique vector ratio (targetViewerVector divided by originViewerVector) to apply the scale.
 
-### - Handling translation
-Regarding translation, we have to consider the two basis origins.
+With that, we can obtain a single matrix containing the two rotations that can be applied to the model:
 
-For any point that we want to transform, we need to subtract the origin of its original base and sum the origin of the target base.
+```js
+let fullRotationMatrix = firstRotationMatrix.clone().multiply(secondRotationMatrix);
+```
+
+And before 
+
+### - Defining the common points for translation
+
+For translation it's quite simple.
+
+We just need two points, and the translation will be the difference between them, just like in the snippet bellow:
+
+```js
+let translationVector = this.points[fixedModelId][0].clone().sub(this.points[this.transformingModelId][0]);
+
+let transformationMatrix;
+let auxTransform = modelToTransform.getModelTransform();
+if (!!auxTransform) {
+  auxTransform.elements[12] += translationVector.x;
+  auxTransform.elements[13] += translationVector.y;
+  auxTransform.elements[14] += translationVector.z;
+  transformationMatrix = auxTransform;
+}
+else {
+  transformationMatrix = (new THREE.Matrix4()).makeTranslation(translationVector.x, translationVector.y, translationVector.z);
+}
+
+modelToTransform.setModelTransform(transformationMatrix);
+```
 
 ## Putting everything together
-For any point conversion between scenes we need to follow the same order below:
 
- - Subtract the base origin of the origin scene
- - Apply the rotation transformation to the vector
- - Apply the scale transformation to the vector
- - Sum the base origin of the target scene
+For any transformation that we need to apply, there's a order we have to obey:
 
-Just like in the following snippet:
+- Define transformation matrices from picked points
+- Obtain the current transformation from the model that we will rotate/translate
+- Add our transformation matrix to the acquired model transform
+- Apply modified transformation matrix to the model
 
-```js
-let targetViewerPoint = originViewerPoint.clone().sub(originBaseOrigin).applyMatrix4(rotationMatrix).applyMatrix4(scaleMatrix).add(targetBaseOrigin);
-```
-With all of that together, we can sync the two scenes like a charm.
-Every time the camera changes, we apply the full transformation for camera target and camera position. For the camera up vector we only need to apply the rotation transformation.
+With all of that together, we can align the two models in the scene smoothly.
 
 ![synced viewer](./assets/synced_viewer.gif)
 
-Also note that for two specific models, this needs to be done **only in the first loading**. After the first calibration, you can store the required information such as matices and vectors in an external DB to be loaded every time the models are compared.
+Also note that for two specific models, this needs to be done **only in the first loading**. After the first alignment, you can store the required information such as matices and vectors in an external DB to be loaded every time the models are compared.
