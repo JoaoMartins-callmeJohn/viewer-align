@@ -28,7 +28,7 @@ Before jumping into the math for our calculations, lets begin with some contextu
 
 Each model is oriented in its own way, that might seem "wrong"when compared with each other.
 
-![misaligned models]()
+![misaligned models](./assets/misaligned_models.png)
 
 We need to find common points in the models that will serve as references for alignment.
 
@@ -39,7 +39,7 @@ To align the models in regards to rotation, we need 3 points for each of them, t
 - 1 to 3 from model A (non-colinear)
 - 4 to 6 from model B (non-colinear)
 
-![6 points taken]()
+![6 points taken](./assets/6_points_taken.png)
 
 These points can be used to define which rotations we'll need to perform in order to align our models.
 
@@ -50,15 +50,15 @@ From these points we can have 4 vectors:
 - v45 from model B
 - v56 from model B
 
-![4 vectors from 6 points]()
+![4 vectors from 6 points](./assets/4_vectors_from_6_points.png)
 
 First rotation is done through the axis of the vectorial product between v12 and v45, by the lesser angle formed between them.
 
-![first rotation from vectors]()
+![first rotation from vectors](./assets/first_rotation_angle.png)
 
 Second rotation is done through the axis of the vectorial product between v23 and v56, by the lesser angle formed between them.  
 
-![second rotation from vectors]()
+![second rotation from vectors](./assets/second_rotation_angle.png)
 
 From these angles and axis, we can define our rotation matrices with the function below:
 
@@ -123,6 +123,12 @@ For any transformation that we need to apply, there's a order we have to obey:
 
 With all of that together, we can align the two models in the scene smoothly.
 
-![synced viewer](./assets/synced_viewer.gif)
+Covering rotation:
+
+![aligned models rotation](./assets/aligned_models_rotation.gif)
+
+And translation:
+
+![aligned models translation](./assets/aligned_models_translation.gif)
 
 Also note that for two specific models, this needs to be done **only in the first loading**. After the first alignment, you can store the required information such as matices and vectors in an external DB to be loaded every time the models are compared.
