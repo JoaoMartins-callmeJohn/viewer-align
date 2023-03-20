@@ -90,14 +90,22 @@
 
   function generateRandomMatrix() {
     let maxValue = 1.57;
-    let rotationX = +(Math.random() * maxValue).toFixed(2);
-    let rotationMatrixX = (new THREE.Matrix4()).makeRotationY(rotationX);
-    let rotationY = +(Math.random() * maxValue).toFixed(2);
-    let rotationMatrixY = (new THREE.Matrix4()).makeRotationY(rotationY);
-    let rotationZ = +(Math.random() * maxValue).toFixed(2);
-    let rotationMatrixZ = (new THREE.Matrix4()).makeRotationY(rotationZ);
+    // let rotationX = +(Math.random() * maxValue).toFixed(2);
+    // let rotationMatrixX = (new THREE.Matrix4()).makeRotationY(rotationX);
+    // let rotationY = +(Math.random() * maxValue).toFixed(2);
+    // let rotationMatrixY = (new THREE.Matrix4()).makeRotationY(rotationY);
+    // let rotationZ = +(Math.random() * maxValue).toFixed(2);
+    // let rotationMatrixZ = (new THREE.Matrix4()).makeRotationY(rotationZ);
 
+    let rotationX = +(0.785398).toFixed(2);
+    let rotationMatrixX = (new THREE.Matrix4()).makeRotationAxis(new THREE.Vector3(1, 0, 0), rotationX);
+    let rotationY = +(0.785398).toFixed(2);
+    let rotationMatrixY = (new THREE.Matrix4()).makeRotationAxis(new THREE.Vector3(0, 1, 0), rotationY);
+    let rotationZ = +(0.785398).toFixed(2);
+    let rotationMatrixZ = (new THREE.Matrix4()).makeRotationAxis(new THREE.Vector3(0, 0, 1), rotationZ);
     return rotationMatrixX.multiply(rotationMatrixY).multiply(rotationMatrixZ);
+    // return rotationMatrixX.multiply(rotationMatrixY);
+    // return rotationMatrixZ;
   }
 
 </script>

@@ -150,13 +150,31 @@ class ModelAlignTool extends Autodesk.Viewing.ToolInterface {
     let modelToTransform = this.viewer.getAllModels().find(m => m.id === this.transformingModelId);
     let fixedModelId = this.transformingModelId === 1 ? 2 : 1;
 
-    //First rotation
-    let firstRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][1].clone().sub(this.points[this.transformingModelId][0]), this.points[fixedModelId][1].clone().sub(this.points[fixedModelId][0]));
+    //Transforming model basis
+    let transformingModelAxis1 = this.points[this.transformingModelId][1].clone().sub(this.points[this.transformingModelId][0]).normalize();
+    let line12 = new THREE.Line3(this.points[this.transformingModelId][0], this.points[this.transformingModelId][1]);
+    let auxPoint = new THREE.Vector3();
+    line12.closestPointToPoint(this.points[this.transformingModelId][2], false, auxPoint);
 
-    //Second rotation
-    let secondRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][2].clone().applyMatrix4(firstRotationMatrix).sub(this.points[this.transformingModelId][1].clone().applyMatrix4(firstRotationMatrix)), this.points[fixedModelId][2].clone().sub(this.points[fixedModelId][1].clone()));
+    let transformingModelAxis2 = this.points[this.transformingModelId][2].clone().sub(auxPoint).normalize();
 
-    let fullRotationMatrix = firstRotationMatrix.clone().multiply(secondRotationMatrix);
+    let transformingModelAxis3 = (new THREE.Vector3()).crossVectors(transformingModelAxis1, transformingModelAxis2).normalize();
+
+    let transformingModelBasis = (new THREE.Matrix4()).makeBasis(transformingModelAxis1, transformingModelAxis2, transformingModelAxis3);
+
+    //Transforming model basis
+    let fixedModelAxis1 = this.points[fixedModelId][1].clone().sub(this.points[fixedModelId][0]).normalize();
+    let line45 = new THREE.Line3(this.points[fixedModelId][0], this.points[fixedModelId][1]);
+    let auxPoint2 = new THREE.Vector3();
+    line45.closestPointToPoint(this.points[fixedModelId][2], false, auxPoint2);
+
+    let fixedModelAxis2 = this.points[fixedModelId][2].clone().sub(auxPoint2).normalize();
+
+    let fixedModelAxis3 = (new THREE.Vector3()).crossVectors(fixedModelAxis1, fixedModelAxis2).normalize();
+
+    let fixedModelBasis = (new THREE.Matrix4()).makeBasis(fixedModelAxis1, fixedModelAxis2, fixedModelAxis3);
+
+    let fullRotationMatrix = (new THREE.Matrix4()).multiplyMatrices(fixedModelBasis, transformingModelBasis.transpose());;
 
     let existingTransform = modelToTransform.getModelTransform();
 
