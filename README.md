@@ -43,16 +43,7 @@ To align the models in regards to rotation, we need 3 points for each of them, t
 
 These points can be used to define which rotations we'll need to perform in order to align our models.
 
-From these points we can have 4 vectors:
-
-- v12 from model A
-- v23 from model A
-- v45 from model B
-- v56 from model B
-
-![4 vectors from 6 points](./assets/4_vectors_from_6_points.png)
-
-We can define the proper rotation matrix as the transformation between arbitrary "bases" of our models. If we use normalized vector as axis of those basis, we won't have distorion, and all this transformation will do is rotate our models.
+We can define the proper rotation matrix as the transformation between arbitrary "bases" of our models. If we use normalized vector as axis of those basis, we won't have distorion/scaling, and all this transformation will do is rotate our models.
 
 First basis (for the rotating model) is defined by the three axis below:
 
