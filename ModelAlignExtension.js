@@ -155,23 +155,17 @@ class ModelAlignTool extends Autodesk.Viewing.ToolInterface {
     let line12 = new THREE.Line3(this.points[this.transformingModelId][0], this.points[this.transformingModelId][1]);
     let auxPoint = new THREE.Vector3();
     line12.closestPointToPoint(this.points[this.transformingModelId][2], false, auxPoint);
-
     let transformingModelAxis2 = this.points[this.transformingModelId][2].clone().sub(auxPoint).normalize();
-
     let transformingModelAxis3 = (new THREE.Vector3()).crossVectors(transformingModelAxis1, transformingModelAxis2).normalize();
-
     let transformingModelBasis = (new THREE.Matrix4()).makeBasis(transformingModelAxis1, transformingModelAxis2, transformingModelAxis3);
 
-    //Transforming model basis
+    //Fixed model basis
     let fixedModelAxis1 = this.points[fixedModelId][1].clone().sub(this.points[fixedModelId][0]).normalize();
     let line45 = new THREE.Line3(this.points[fixedModelId][0], this.points[fixedModelId][1]);
     let auxPoint2 = new THREE.Vector3();
     line45.closestPointToPoint(this.points[fixedModelId][2], false, auxPoint2);
-
     let fixedModelAxis2 = this.points[fixedModelId][2].clone().sub(auxPoint2).normalize();
-
     let fixedModelAxis3 = (new THREE.Vector3()).crossVectors(fixedModelAxis1, fixedModelAxis2).normalize();
-
     let fixedModelBasis = (new THREE.Matrix4()).makeBasis(fixedModelAxis1, fixedModelAxis2, fixedModelAxis3);
 
     let fullRotationMatrix = (new THREE.Matrix4()).multiplyMatrices(fixedModelBasis, transformingModelBasis.transpose());;
@@ -187,12 +181,6 @@ class ModelAlignTool extends Autodesk.Viewing.ToolInterface {
     }
 
     modelToTransform.setModelTransform(transformationMatrix);
-  }
-
-  findRotationMatrix(firstVector, secondVector) {
-    let rotationAxis = (new THREE.Vector3()).crossVectors(firstVector, secondVector).normalize();
-    let rotationAngle = firstVector.angleTo(secondVector);
-    return (new THREE.Matrix4()).makeRotationAxis(rotationAxis, rotationAngle);
   }
 
   resetPoints() {

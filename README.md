@@ -26,7 +26,7 @@ With a combination of all these conversions (rotation and translation) we can al
 
 Before jumping into the math for our calculations, lets begin with some contextualization.
 
-Each model is oriented in its own way, that might seem "wrong"when compared with each other.
+Each model is oriented in its own way, that might seem "wrong" when compared with each other.
 
 ![misaligned models](./assets/misaligned_models.png)
 
@@ -52,41 +52,60 @@ From these points we can have 4 vectors:
 
 ![4 vectors from 6 points](./assets/4_vectors_from_6_points.png)
 
-First rotation is done through the axis of the vectorial product between v12 and v45, by the lesser angle formed between them.
+We can define the proper rotation matrix as the transformation between arbitrary "bases" of our models. If we use normalized vector as axis of those basis, we won't have distorion, and all this transformation will do is rotate our models.
 
-![first rotation from vectors](./assets/first_rotation_angle.png)
+First basis (for the rotating model) is defined by the three axis below:
 
-Second rotation is done through the axis of the vectorial product between v23 and v56, by the lesser angle formed between them.  
+1. The vector from point 1 to point 2 (normalized)
+2. The height of the triangle formed by points 1, 2, and 3 relative to the base formed by points 1 and 2 (normalized)
+3. The vector product from axis 1 and axis 2 (normalized)
 
-![second rotation from vectors](./assets/second_rotation_angle.png)
+Just like in the image below:
 
-From these angles and axis, we can define our rotation matrices with the function below:
+![first model basis](./assets/first_model_basis.png)
+
+Second basis is defined using the same logic, but this time for the fixed model. Instead of points 1, 2, and 3 we'll have points 4, 5, and 6. 
+
+With that, we'll have asnippet just like the one below:
 
 ```js
-findRotationMatrix(firstVector, secondVector) {
-  let rotationAxis = (new THREE.Vector3()).crossVectors(firstVector, secondVector).normalize();
-  let rotationAngle = firstVector.angleTo(secondVector);
-  return (new THREE.Matrix4()).makeRotationAxis(rotationAxis, rotationAngle);
+let modelToTransform = this.viewer.getAllModels().find(m => m.id === this.transformingModelId);
+let fixedModelId = this.transformingModelId === 1 ? 2 : 1;
+
+//Transforming model basis
+let transformingModelAxis1 = this.points[this.transformingModelId][1].clone().sub(this.points[this.transformingModelId][0]).normalize();
+let line12 = new THREE.Line3(this.points[this.transformingModelId][0], this.points[this.transformingModelId][1]);
+let auxPoint = new THREE.Vector3();
+line12.closestPointToPoint(this.points[this.transformingModelId][2], false, auxPoint);
+let transformingModelAxis2 = this.points[this.transformingModelId][2].clone().sub(auxPoint).normalize();
+let transformingModelAxis3 = (new THREE.Vector3()).crossVectors(transformingModelAxis1, transformingModelAxis2).normalize();
+let transformingModelBasis = (new THREE.Matrix4()).makeBasis(transformingModelAxis1, transformingModelAxis2, transformingModelAxis3);
+
+//Fixed model basis
+let fixedModelAxis1 = this.points[fixedModelId][1].clone().sub(this.points[fixedModelId][0]).normalize();
+let line45 = new THREE.Line3(this.points[fixedModelId][0], this.points[fixedModelId][1]);
+let auxPoint2 = new THREE.Vector3();
+line45.closestPointToPoint(this.points[fixedModelId][2], false, auxPoint2);
+let fixedModelAxis2 = this.points[fixedModelId][2].clone().sub(auxPoint2).normalize();
+let fixedModelAxis3 = (new THREE.Vector3()).crossVectors(fixedModelAxis1, fixedModelAxis2).normalize();
+let fixedModelBasis = (new THREE.Matrix4()).makeBasis(fixedModelAxis1, fixedModelAxis2, fixedModelAxis3);
+
+let fullRotationMatrix = (new THREE.Matrix4()).multiplyMatrices(fixedModelBasis, transformingModelBasis.transpose());;
+
+let existingTransform = modelToTransform.getModelTransform();
+
+let transformationMatrix;
+if (!!existingTransform) {
+  transformationMatrix = existingTransform.clone().multiply(fullRotationMatrix);
 }
+else {
+  transformationMatrix = fullRotationMatrix;
+}
+
+modelToTransform.setModelTransform(transformationMatrix);
 ```
 
-We just need to be aware that by the time we apply the second rotation, the first rotation would already be applied, so we need to apply the first rotation matrix on the points moved before defining the second rotation matrix.
-
-```js
-//First rotation
-let firstRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][1].clone().sub(this.points[this.transformingModelId][0]), this.points[fixedModelId][1].clone().sub(this.points[fixedModelId][0]));
-
-//Second rotation
-let secondRotationMatrix = this.findRotationMatrix(this.points[this.transformingModelId][2].clone().applyMatrix4(firstRotationMatrix).sub(this.points[this.transformingModelId][1].clone().applyMatrix4(firstRotationMatrix)), this.points[fixedModelId][2].clone().sub(this.points[fixedModelId][1].clone()));
-```
-
-With that, we can obtain a single matrix containing the two rotations that can be applied to the model:
-
-```js
-let fullRotationMatrix = firstRotationMatrix.clone().multiply(secondRotationMatrix);
-```
-
-And before 
+With that, we take care of the proper alignment between the two models.
 
 ### - Defining the common points for translation
 
