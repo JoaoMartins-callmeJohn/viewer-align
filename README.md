@@ -6,6 +6,8 @@
 
 This sample demonstrates a way to align and transform two models in the same scene. Maybe you have each discipline coming from a different source format, softwares or designed in a way that they don't simply align with each other when loaded in the same scene. This sample will show how you can take advantage of common points from different models in order to align them.
 
+TRY AT https://joaomartins-callmejohn.github.io/viewer-align/
+
 ## Premises
 
 As our base assumption for this sample, we're going to assume that the models are compatible, i.e they refer to the same context, differing in positioning and/or rotation. We aren't handling rotation in this example to simplify our workflow, but it can easily be addressed using similar logic.
