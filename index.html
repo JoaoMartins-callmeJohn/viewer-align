@@ -49,7 +49,7 @@
 </body>
 
 <script>
-  var tokenurl = 'https://l15xenb90a.execute-api.us-east-1.amazonaws.com/default/GetToken';
+  var tokenurl = 'https://ofqpu7zzyxo37gd7cserg6pq440bifrx.lambda-url.us-east-1.on.aws/';
 
   var viewer;
   async function initViewers() {
@@ -58,7 +58,7 @@
     }).then(function (token) {
 
       // Sample urns
-      let urns = ['dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Y29vcmRpbmF0ZW1vZGVsc2pwb20vcmFjYmFzaWNzYW1wbGVwcm9qZWN0LTEwLnJ2dA', 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Y29vcmRpbmF0ZW1vZGVsc2pwb20vcnN0YmFzaWNzYW1wbGVwcm9qZWN0LnJ2dA'];
+      let urns = ['dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6am9hby1tYXJ0aW5zLWRlbW8tYnVja2V0L3JhY2Jhc2ljc2FtcGxlcHJvamVjdC5ydnQ', 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6am9hby1tYXJ0aW5zLWRlbW8tYnVja2V0L3JzdGJhc2ljc2FtcGxlcHJvamVjdC5ydnQ'];
 
       const options = {
         env: 'AutodeskProduction',
