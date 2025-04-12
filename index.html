@@ -53,7 +53,12 @@
 
   var viewer;
   async function initViewers() {
-    await fetch(tokenurl).then(function (response) {
+    await fetch(tokenurl,{
+    method: 'GET', // or 'POST', 'PUT', 'DELETE', etc.
+    headers: {
+        'Content-Type': 'application/json'
+    }
+}).then(function (response) {
       return response.json();
     }).then(function (token) {
 
